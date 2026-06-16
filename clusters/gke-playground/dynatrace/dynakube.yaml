@@ -1,6 +1,8 @@
-# DynaKube custom resources for the GKE playground cluster.
+# DynaKube custom resource for the GKE playground cluster.
+# Single full-stack DynaKube: cloudNativeFullStack OneAgent + one ActiveGate
+# carrying all capabilities (kubernetes-monitoring, routing, debugging).
 # NOTE: the token Secret (named "brian-obs-playground") is intentionally NOT
-# in this repo. Create it by hand — see ../setup.md. ArgoCD applies only these CRs.
+# in this repo. Create it by hand — see ../setup.md. ArgoCD applies only this CR.
 ---
 apiVersion: dynatrace.com/v1beta6
 kind: DynaKube
@@ -10,29 +12,6 @@ metadata:
   labels:
     dynatrace.com/created-by: "dynatrace.kubernetes"
 # https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/reference/dynakube-parameters
-spec:
-  apiUrl: https://anr47691.sprint.dynatracelabs.com/api
-  tokens: brian-obs-playground
-  networkZone: gke
-  activeGate:
-    capabilities:
-      - kubernetes-monitoring
-    resources:
-      requests:
-        cpu: 1000m
-        memory: 10Gi
-      limits:
-        cpu: 2000m
-        memory: 10Gi
-    replicas: 1
----
-apiVersion: dynatrace.com/v1beta6
-kind: DynaKube
-metadata:
-  name: brian-obs-playground-agents
-  namespace: dynatrace
-  labels:
-    dynatrace.com/created-by: "dynatrace.kubernetes"
 spec:
   apiUrl: https://anr47691.sprint.dynatracelabs.com/api
   tokens: brian-obs-playground
@@ -49,16 +28,17 @@ spec:
           operator: Exists
   activeGate:
     capabilities:
+      - kubernetes-monitoring
       - routing
       - debugging
     resources:
       requests:
-        cpu: 500m
-        memory: 4Gi
+        cpu: 1000m
+        memory: 10Gi
       limits:
         cpu: 2000m
-        memory: 4Gi
-    replicas: 3
+        memory: 10Gi
+    replicas: 1
   templates:
     extensionExecutionController:
       imageRef:
