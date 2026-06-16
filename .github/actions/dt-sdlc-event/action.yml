@@ -1,0 +1,64 @@
+name: "Dynatrace SDLC event"
+description: >
+  Send a normalized SDLC_EVENT to the Dynatrace built-in events.sdlc ingest
+  endpoint (/platform/ingest/v1/events.sdlc). Reusable across repos:
+    uses: <org>/gitops/.github/actions/dt-sdlc-event@main
+  Docs: https://docs.dynatrace.com/docs/deliver/pipeline-observability-sdlc-events/sdlc-events
+  Schema: https://docs.dynatrace.com/docs/semantic-dictionary/model/sdlc-events
+
+inputs:
+  dt-url:
+    description: "Dynatrace env base URL, e.g. https://anr47691.sprint.dynatracelabs.com (no trailing slash, no /api)."
+    required: true
+  dt-token:
+    description: "Access/platform token with scope openpipeline.events_sdlc."
+    required: true
+  event-type:
+    description: "SDLC event type: run | build | deployment | change | validation."
+    required: true
+  event-status:
+    description: "Status: queued | started | finished."
+    required: true
+  properties:
+    description: "JSON object string of additional SDLC fields (cicd.*, vcs.*, artifact.*, task.*, event.provider, start_time, end_time, ...)."
+    required: false
+    default: "{}"
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        DT_URL: ${{ inputs.dt-url }}
+        DT_TOKEN: ${{ inputs.dt-token }}
+        EVENT_TYPE: ${{ inputs.event-type }}
+        EVENT_STATUS: ${{ inputs.event-status }}
+        PROPS: ${{ inputs.properties }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${DT_URL:-}" || -z "${DT_TOKEN:-}" ]]; then
+          echo "::error::dt-url and dt-token are required (set the DT_URL and DT_SDLC_TOKEN secrets)."
+          exit 1
+        fi
+        endpoint="${DT_URL%/}/platform/ingest/v1/events.sdlc"
+        # Base fields + merged caller properties. The endpoint auto-adds
+        # event.kind=SDLC_EVENT and derives event.category from pipeline.*/task.*.
+        payload="$(jq -nc \
+          --arg type   "$EVENT_TYPE" \
+          --arg status "$EVENT_STATUS" \
+          --argjson props "${PROPS:-{}}" \
+          '{ "event.type": $type, "event.status": $status } + $props')"
+        echo "POST ${endpoint}"
+        echo "$payload" | jq .
+        code="$(curl -sS -o /tmp/dt_sdlc_resp -w '%{http_code}' -X POST "${endpoint}" \
+          -H 'Content-Type: application/json' \
+          -H "Authorization: Api-Token ${DT_TOKEN}" \
+          -d "${payload}")"
+        echo "Dynatrace responded HTTP ${code}"
+        cat /tmp/dt_sdlc_resp 2>/dev/null || true
+        echo
+        if [[ "${code}" != "202" ]]; then
+          echo "::error::SDLC ingest expected HTTP 202, got ${code}"
+          exit 1
+        fi
+        echo "::notice::Sent SDLC ${EVENT_TYPE}/${EVENT_STATUS} event."

@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dynatrace-dynakube
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"   # after the operator CRDs + webhook are up
+spec:
+  project: playground
+  source:
+    repoURL: https://github.com/bmg24/gitops.git
+    targetRevision: main
+    path: clusters/gke-playground/dynatrace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dynatrace
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

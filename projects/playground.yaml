@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: playground
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Observability playground apps
+  # Repos ArgoCD is allowed to deploy from
+  sourceRepos:
+    - https://github.com/bmg24/gitops.git
+    - https://github.com/bmg24/easytrade-config.git
+    - https://github.com/Dynatrace/easytrade        # remote kustomize base
+    - public.ecr.aws/dynatrace                       # operator Helm (OCI)
+  # Where it may deploy
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: dynatrace
+    - server: https://kubernetes.default.svc
+      namespace: easytrade
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+  # Operator installs cluster-scoped resources (CRDs, webhooks, RBAC)
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

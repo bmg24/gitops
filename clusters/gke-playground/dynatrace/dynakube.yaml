@@ -1,0 +1,80 @@
+# DynaKube custom resources for the GKE playground cluster.
+# NOTE: the token Secret (named "brian-goins-playground") is intentionally NOT
+# in this repo. Create it by hand — see ../setup.md. ArgoCD applies only these CRs.
+---
+apiVersion: dynatrace.com/v1beta6
+kind: DynaKube
+metadata:
+  name: brian-goins-playground
+  namespace: dynatrace
+  labels:
+    dynatrace.com/created-by: "dynatrace.kubernetes"
+# https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/reference/dynakube-parameters
+spec:
+  apiUrl: https://anr47691.sprint.dynatracelabs.com/api
+  tokens: brian-goins-playground
+  networkZone: gke
+  activeGate:
+    capabilities:
+      - kubernetes-monitoring
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 10Gi
+      limits:
+        cpu: 2000m
+        memory: 10Gi
+    replicas: 1
+---
+apiVersion: dynatrace.com/v1beta6
+kind: DynaKube
+metadata:
+  name: brian-goins-playground-agents
+  namespace: dynatrace
+  labels:
+    dynatrace.com/created-by: "dynatrace.kubernetes"
+spec:
+  apiUrl: https://anr47691.sprint.dynatracelabs.com/api
+  tokens: brian-goins-playground
+  networkZone: gke
+  oneAgent:
+    hostGroup: gke
+    cloudNativeFullStack:
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+  activeGate:
+    capabilities:
+      - routing
+      - debugging
+    resources:
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    replicas: 3
+  templates:
+    extensionExecutionController:
+      imageRef:
+        repository: anr47691.sprint.dynatracelabs.com/linux/dynatrace-eec
+        tag: latest
+    otelCollector:
+      imageRef:
+        repository: public.ecr.aws/dynatrace/dynatrace-otel-collector
+        tag: latest
+  logMonitoring: {}
+  telemetryIngest:
+    protocols:
+      - jaeger
+      - otlp
+      - statsd
+      - zipkin
+    serviceName: telemetry-ingest
+  extensions:
+    prometheus: {}

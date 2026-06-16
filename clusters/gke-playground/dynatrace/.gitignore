@@ -1,0 +1,3 @@
+# Never commit real Dynatrace tokens
+secret.yaml
+*.secret.yaml

@@ -1,0 +1,6 @@
+# Secrets — never commit
+secret.yaml
+*.secret.yaml
+*.key
+*.pem
+.env

@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dynatrace-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"   # first: installs CRDs + webhook
+spec:
+  project: playground
+  source:
+    repoURL: public.ecr.aws/dynatrace
+    chart: dynatrace-operator
+    # Pinned to the latest GA release. The 1.9.0 line is still RC/pre-release
+    # (unsupported) as of 2026-06-16 — do not use it on the playground.
+    # https://github.com/Dynatrace/dynatrace-operator/releases
+    targetRevision: 1.8.1
+    helm:
+      values: |
+        # CSI driver is required for cloudNativeFullStack (local OneAgent cache)
+        csidriver:
+          enabled: true
+        installCRD: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dynatrace
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true   # CRDs can exceed the client-side apply size limit

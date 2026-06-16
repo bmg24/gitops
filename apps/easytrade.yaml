@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: easytrade
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"   # last: deploy the workload
+spec:
+  project: playground
+  source:
+    repoURL: https://github.com/bmg24/easytrade-config.git
+    targetRevision: main
+    path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: easytrade
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
