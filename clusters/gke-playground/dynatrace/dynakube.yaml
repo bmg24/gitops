@@ -1,18 +1,18 @@
 # DynaKube custom resources for the GKE playground cluster.
-# NOTE: the token Secret (named "brian-goins-playground") is intentionally NOT
+# NOTE: the token Secret (named "brian-obs-playground") is intentionally NOT
 # in this repo. Create it by hand — see ../setup.md. ArgoCD applies only these CRs.
 ---
 apiVersion: dynatrace.com/v1beta6
 kind: DynaKube
 metadata:
-  name: brian-goins-playground
+  name: brian-obs-playground
   namespace: dynatrace
   labels:
     dynatrace.com/created-by: "dynatrace.kubernetes"
 # https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/reference/dynakube-parameters
 spec:
   apiUrl: https://anr47691.sprint.dynatracelabs.com/api
-  tokens: brian-goins-playground
+  tokens: brian-obs-playground
   networkZone: gke
   activeGate:
     capabilities:
@@ -29,13 +29,13 @@ spec:
 apiVersion: dynatrace.com/v1beta6
 kind: DynaKube
 metadata:
-  name: brian-goins-playground-agents
+  name: brian-obs-playground-agents
   namespace: dynatrace
   labels:
     dynatrace.com/created-by: "dynatrace.kubernetes"
 spec:
   apiUrl: https://anr47691.sprint.dynatracelabs.com/api
-  tokens: brian-goins-playground
+  tokens: brian-obs-playground
   networkZone: gke
   oneAgent:
     hostGroup: gke
