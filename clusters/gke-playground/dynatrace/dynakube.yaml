@@ -1,8 +1,31 @@
 # DynaKube custom resource for the GKE playground cluster.
-# Single full-stack DynaKube: cloudNativeFullStack OneAgent + one ActiveGate
-# carrying all capabilities (kubernetes-monitoring, routing, debugging).
-# NOTE: the token Secret (named "brian-obs-playground") is intentionally NOT
-# in this repo. Create it by hand — see ../setup.md. ArgoCD applies only this CR.
+# Single full-stack DynaKube: cloudNativeFullStack OneAgent + one ActiveGate.
+#
+# IMAGE SOURCE (important): this sprint/internal tenant's built-in registry
+# (anr47691.sprint.dynatracelabs.com/linux/...) does NOT host the agent/AG/EEC
+# container images — every manifest tag 404s. Dynatrace also recommends AGAINST
+# using the built-in registry for images. So we pull OneAgent / CodeModules /
+# ActiveGate from the public Amazon ECR registry instead (same source the OTel
+# collector already used successfully). Public ECR is anonymous → no pull secret.
+#   https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/guides/container-registries/use-public-registry
+#
+# EEC NOTE: dynatrace-eec is NOT published to the public registry, so the
+# extensions / extensionExecutionController / otelCollector / telemetryIngest
+# features (which need EEC) are intentionally REMOVED here. Core full-stack
+# (hosts, processes, K8s, services/traces) does not need them. Re-add later only
+# if you have an EEC image source (e.g. the built-in registry once populated, or
+# a private mirror).
+#
+# TAGS: public ECR uses immutable version tags (no `latest`). Pin to a real
+# available tag — list them with:
+#   skopeo list-tags docker://public.ecr.aws/dynatrace/dynatrace-oneagent
+#   skopeo list-tags docker://public.ecr.aws/dynatrace/dynatrace-activegate
+#   (or browse https://gallery.ecr.aws/dynatrace)
+# Replace REPLACE_WITH_AVAILABLE_TAG below with the newest tag (same tag works
+# for oneagent + codemodules; activegate has its own tag).
+#
+# NOTE: the token Secret ("brian-obs-playground") is created by hand (see
+# ../setup.md), gitignored, and ArgoCD applies only this CR.
 ---
 apiVersion: dynatrace.com/v1beta6
 kind: DynaKube
@@ -19,6 +42,9 @@ spec:
   oneAgent:
     hostGroup: gke
     cloudNativeFullStack:
+      # Pull from public ECR instead of the (empty) built-in registry.
+      image: public.ecr.aws/dynatrace/dynatrace-oneagent:1.339.55.20260615-110349
+      codeModulesImage: public.ecr.aws/dynatrace/dynatrace-codemodules:1.339.55.20260615-110349
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
@@ -31,6 +57,8 @@ spec:
       - kubernetes-monitoring
       - routing
       - debugging
+    # Pull from public ECR instead of the (empty) built-in registry.
+    image: public.ecr.aws/dynatrace/dynatrace-activegate:1.339.39.20260605-153224
     resources:
       requests:
         cpu: 1000m
@@ -39,22 +67,3 @@ spec:
         cpu: 2000m
         memory: 10Gi
     replicas: 1
-  templates:
-    extensionExecutionController:
-      imageRef:
-        repository: anr47691.sprint.dynatracelabs.com/linux/dynatrace-eec
-        tag: latest
-    otelCollector:
-      imageRef:
-        repository: public.ecr.aws/dynatrace/dynatrace-otel-collector
-        tag: latest
-  logMonitoring: {}
-  telemetryIngest:
-    protocols:
-      - jaeger
-      - otlp
-      - statsd
-      - zipkin
-    serviceName: telemetry-ingest
-  extensions:
-    prometheus: {}
