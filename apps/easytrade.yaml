@@ -7,10 +7,20 @@ metadata:
     argocd.argoproj.io/sync-wave: "10"   # last: deploy the workload
 spec:
   project: playground
+  # Deploys the easytrade Helm chart straight from the fork (bmg24/easytrade-1).
+  # The 'app' subchart is vendored under helm/easytrade/charts/app, so ArgoCD
+  # renders it with no remote dependency fetch. Tinker with the chart/code in the
+  # fork; ArgoCD picks up changes on main.
   source:
-    repoURL: https://github.com/bmg24/easytrade-config.git
+    repoURL: https://github.com/bmg24/easytrade-1.git
     targetRevision: main
-    path: .
+    path: helm/easytrade
+    helm:
+      releaseName: easytrade
+      # Add value overrides here if needed, e.g.:
+      # values: |
+      #   loadgen:
+      #     enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: easytrade

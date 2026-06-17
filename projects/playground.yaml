@@ -10,8 +10,7 @@ spec:
   # Repos ArgoCD is allowed to deploy from
   sourceRepos:
     - https://github.com/bmg24/gitops.git
-    - https://github.com/bmg24/easytrade-config.git
-    - https://github.com/Dynatrace/easytrade        # remote kustomize base
+    - https://github.com/bmg24/easytrade-1.git       # forked easytrade (Helm chart)
     - public.ecr.aws/dynatrace                       # operator Helm (OCI)
   # Where it may deploy
   destinations:
