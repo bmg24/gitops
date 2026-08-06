@@ -39,6 +39,21 @@ spec:
   apiUrl: https://anr47691.sprint.dynatracelabs.com/api
   tokens: brian-obs-playground
   networkZone: gke
+  # Injection scope (added 2026-08-06). Top-level namespaceSelector is a LabelSelector
+  # that governs where the operator injects OneAgent AND applies metadata enrichment /
+  # OTLP auto-config (applies to cloudNativeFullStack + applicationMonitoring).
+  # Without it, every non-system namespace is injected. We use a NotIn expression so
+  # EVERY namespace stays injected EXCEPT ones explicitly labeled
+  # `dynatrace-injection: disabled`. The `astroshop` namespace carries that label so it
+  # is observed 100% via OpenTelemetry + Bindplane with ZERO OneAgent involvement.
+  # (NotIn also matches namespaces that lack the key, so easytrade/etc. keep injecting.)
+  # Docs: https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/reference/dynakube-parameters
+  namespaceSelector:
+    matchExpressions:
+      - key: dynatrace-injection
+        operator: NotIn
+        values:
+          - disabled
   oneAgent:
     hostGroup: gke
     cloudNativeFullStack:
