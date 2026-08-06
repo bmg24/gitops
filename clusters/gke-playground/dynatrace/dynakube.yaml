@@ -39,24 +39,36 @@ spec:
   apiUrl: https://anr47691.sprint.dynatracelabs.com/api
   tokens: brian-obs-playground
   networkZone: gke
-  # Injection scope (added 2026-08-06). Top-level namespaceSelector is a LabelSelector
-  # that governs where the operator injects OneAgent AND applies metadata enrichment /
-  # OTLP auto-config (applies to cloudNativeFullStack + applicationMonitoring).
-  # Without it, every non-system namespace is injected. We use a NotIn expression so
-  # EVERY namespace stays injected EXCEPT ones explicitly labeled
-  # `dynatrace-injection: disabled`. The `astroshop` namespace carries that label so it
-  # is observed 100% via OpenTelemetry + Bindplane with ZERO OneAgent involvement.
-  # (NotIn also matches namespaces that lack the key, so easytrade/etc. keep injecting.)
-  # Docs: https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/reference/dynakube-parameters
-  namespaceSelector:
-    matchExpressions:
-      - key: dynatrace-injection
-        operator: NotIn
-        values:
-          - disabled
+  # Metadata-enrichment scope (added 2026-08-06). Keep enrichment on everywhere EXCEPT
+  # namespaces labeled `dynatrace-injection: disabled`, so astroshop gets no Dynatrace
+  # webhook mutation at all — it is observed purely via OpenTelemetry + Bindplane.
+  # (Separate LabelSelector from the OneAgent one below; NotIn also matches namespaces
+  # that lack the label, so easytrade/etc. keep being enriched.)
+  metadataEnrichment:
+    enabled: true
+    namespaceSelector:
+      matchExpressions:
+        - key: dynatrace-injection
+          operator: NotIn
+          values:
+            - disabled
   oneAgent:
     hostGroup: gke
     cloudNativeFullStack:
+      # Injection scope (added 2026-08-06). In DynaKube v1beta6 the injection
+      # namespaceSelector belongs to the AppInjectionSpec INSIDE cloudNativeFullStack
+      # (NOT top-level spec.namespaceSelector — that field is not in the v1beta6 schema
+      # and ArgoCD rejects it with "field not declared in schema"). NotIn keeps every
+      # namespace injected except ones labeled `dynatrace-injection: disabled`
+      # (astroshop); NotIn also matches namespaces without the label so easytrade/etc.
+      # keep injecting.
+      # Docs: https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/reference/dynakube-parameters
+      namespaceSelector:
+        matchExpressions:
+          - key: dynatrace-injection
+            operator: NotIn
+            values:
+              - disabled
       # Pull from public ECR instead of the (empty) built-in registry.
       image: public.ecr.aws/dynatrace/dynatrace-oneagent:1.339.55.20260615-110349
       codeModulesImage: public.ecr.aws/dynatrace/dynatrace-codemodules:1.339.55.20260615-110349
