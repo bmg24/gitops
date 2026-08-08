@@ -1,0 +1,60 @@
+# Astroshop (OpenTelemetry Demo) — deployed pure-OTel via Bindplane, NO OneAgent.
+#
+# Design (see clusters/gke-playground/astroshop/README.md):
+#   - Community Helm chart `opentelemetry-demo` (chart source) + our values overrides
+#     (values file lives in THIS gitops repo, pulled via the multi-source $values ref).
+#   - Bundled OTel collector + demo backends (Jaeger/Prometheus/Grafana/OpenSearch) are
+#     DISABLED. All services export OTLP to the Bindplane-managed gateway instead.
+#   - Namespace `astroshop` is created with label `dynatrace-injection: disabled` so the
+#     DynaKube namespaceSelector skips it — zero OneAgent / zero Dynatrace webhook.
+#   - Custom images for DevCycle (Step 4) will be referenced later via
+#     components.<svc>.imageOverride pointing at the bmg24/astroshop fork's built images.
+#
+# Sync order: this app is wave 20 so it runs AFTER the Bindplane collectors (wave 15),
+# guaranteeing the gateway service exists before astroshop services start exporting.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: astroshop
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: playground
+  sources:
+    # 1) The chart itself, from the community Helm repo.
+    - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      chart: opentelemetry-demo
+      # Pinned to opentelemetry-demo chart 0.41.0 (app 3.0.0), current as of 2026-08-08.
+      # Bump deliberately; check versions with:
+      #   helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+      #   helm repo update && helm search repo open-telemetry/opentelemetry-demo --versions | head
+      targetRevision: 0.41.0
+      helm:
+        valueFiles:
+          - $values/clusters/gke-playground/astroshop/values.yaml
+    # 2) This gitops repo, only to supply the values file above (ref: values).
+    - repoURL: https://github.com/bmg24/gitops.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: astroshop
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    # Label the auto-created namespace so OneAgent injection is excluded from creation
+    # (no injection window). Matches the DynaKube namespaceSelector NotIn expression.
+    managedNamespaceMetadata:
+      labels:
+        dynatrace-injection: disabled
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

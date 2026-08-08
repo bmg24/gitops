@@ -1,0 +1,5 @@
+# Never commit the real Dynatrace credential Secret. Apply it by hand via kubectl,
+# same pattern as the DynaKube token. Commit only collector.yaml + docs.
+secret.yaml
+*-secret.yaml
+*.secret.yaml

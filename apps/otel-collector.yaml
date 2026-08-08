@@ -1,0 +1,46 @@
+# Raw Dynatrace OTel Collector (Gateway) — the astroshop OTLP pipeline, collector-first.
+#
+# Bindplane-UNMANAGED to start: a plain Gateway collector that receives astroshop OTLP and
+# exports to the Dynatrace tenant. This replaces the Bindplane collectors as the initial egress
+# (see clusters/gke-playground/otel-collector/README.md). Promote to Bindplane management later
+# by repointing the collector's OpAMP endpoint — no change to astroshop wiring required.
+#
+# Sync-wave 15: BEFORE astroshop (wave 20), so the gateway Service exists before astroshop
+# services start exporting.
+#
+# The DT credential Secret (dynatrace-otelcol-credentials) is gitignored and applied by hand,
+# so ArgoCD manages only the Namespace/RBAC/ConfigMap/Deployment/Service.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-collector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  project: playground
+  source:
+    repoURL: https://github.com/bmg24/gitops.git
+    targetRevision: main
+    path: clusters/gke-playground/otel-collector
+    directory:
+      recurse: true
+      include: '*.yaml'
+      # Never render the credential template as a real resource.
+      exclude: '{secret.example.yaml}'
+  destination:
+    server: https://kubernetes.default.svc
+    # The Namespace resource is included in collector.yaml; this is where the rest land.
+    namespace: otel-collector
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

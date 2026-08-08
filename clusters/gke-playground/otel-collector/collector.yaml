@@ -1,0 +1,222 @@
+# Raw Dynatrace OTel Collector — Gateway mode for astroshop (pure OTel, NO OneAgent).
+#
+# This is the "collector-first" start: a plain, Bindplane-UNMANAGED Gateway collector
+# that receives astroshop's OTLP (traces/metrics/logs) and exports straight to the
+# Dynatrace tenant. It proves the OTLP pipeline end-to-end. Later we can bring this same
+# collector under Bindplane by pointing its OpAMP endpoint at Bindplane Cloud — the
+# telemetry it emits does not change, only how the config is managed.
+#
+# Native Kubernetes app (namespace/workload/pod topology) is already covered for the
+# WHOLE cluster by the existing DynaKube `kubernetes-monitoring` ActiveGate — this
+# collector does NOT need k8s_cluster/kubeletstats receivers for that. It ships app
+# telemetry only. (Add those receivers later only if you want the separate pure-OTel
+# "OpenTelemetry K8s" dashboards.)
+#
+# Image: Dynatrace distro from public ECR (same source pattern as the OneAgent/AG images;
+# the sprint tenant's built-in registry does not host these).
+# Credentials: the DT_ENDPOINT + DT_API_TOKEN live in a Secret created out-of-band
+# (see README.md → secret.example.yaml). The Secret is gitignored; ArgoCD manages only
+# the resources in this file.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-collector
+  labels:
+    # Exclude the collector's own pod from OneAgent injection + Dynatrace webhook mutation.
+    # Matches the DynaKube namespaceSelector (NotIn "disabled") so the collector stays pure OTel.
+    dynatrace-injection: disabled
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector
+  namespace: otel-collector
+---
+# RBAC for the k8sattributes processor: it watches pods/namespaces/replicasets to enrich
+# incoming OTLP with k8s.* resource attributes (namespace, pod, workload) by source IP.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-collector-k8sattributes
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets", "deployments", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector-k8sattributes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otel-collector-k8sattributes
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector
+    namespace: otel-collector
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: otel-collector
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      # Guard against OOM under load spikes (limit slightly below the container limit).
+      memory_limiter:
+        check_interval: 5s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+      # Enrich spans/metrics/logs with k8s metadata based on the sender pod's IP.
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.deployment.name
+            - k8s.replicaset.name
+            - k8s.statefulset.name
+            - k8s.daemonset.name
+            - k8s.node.name
+            - k8s.container.name
+        pod_association:
+          - sources:
+              - from: connection
+      batch:
+        send_batch_size: 1000
+        timeout: 10s
+
+    exporters:
+      # Canonical OTLP/HTTP exporter → Dynatrace tenant OTLP API. Api-Token auth.
+      otlphttp:
+        endpoint: ${env:DT_ENDPOINT}
+        headers:
+          Authorization: "Api-Token ${env:DT_API_TOKEN}"
+
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+
+    service:
+      extensions: [health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlphttp]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlphttp]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlphttp]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: otel-collector
+  labels:
+    app.kubernetes.io/name: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otel-collector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: otel-collector
+    spec:
+      serviceAccountName: otel-collector
+      containers:
+        - name: otel-collector
+          image: public.ecr.aws/dynatrace/dynatrace-otel-collector:0.52.0
+          args: ["--config", "/conf/config.yaml"]
+          env:
+            - name: DT_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: dynatrace-otelcol-credentials
+                  key: DT_ENDPOINT
+            - name: DT_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dynatrace-otelcol-credentials
+                  key: DT_API_TOKEN
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+            - name: health
+              containerPort: 13133
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 13133
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 13133
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: otel-collector
+  labels:
+    app.kubernetes.io/name: otel-collector
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: otel-collector
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+      appProtocol: grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP

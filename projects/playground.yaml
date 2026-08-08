@@ -12,6 +12,8 @@ spec:
     - https://github.com/bmg24/gitops.git
     - https://github.com/bmg24/easytrade-1.git       # forked easytrade (Helm chart)
     - public.ecr.aws/dynatrace                       # operator Helm (OCI)
+    - https://open-telemetry.github.io/opentelemetry-helm-charts   # astroshop (community Helm chart)
+    - https://github.com/bmg24/astroshop.git         # forked OTel demo — custom images for DevCycle (Step 4)
   # Where it may deploy
   destinations:
     - server: https://kubernetes.default.svc
@@ -20,6 +22,12 @@ spec:
       namespace: easytrade
     - server: https://kubernetes.default.svc
       namespace: argocd
+    - server: https://kubernetes.default.svc
+      namespace: astroshop
+    - server: https://kubernetes.default.svc
+      namespace: bindplane-agent
+    - server: https://kubernetes.default.svc
+      namespace: otel-collector
   # Operator installs cluster-scoped resources (CRDs, webhooks, RBAC)
   clusterResourceWhitelist:
     - group: "*"

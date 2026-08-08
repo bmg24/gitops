@@ -1,0 +1,49 @@
+# Astroshop values overrides — pure OpenTelemetry + Bindplane, no OneAgent, no demo backends.
+# Consumed by apps/astroshop.yaml via the ArgoCD multi-source $values ref.
+#
+# What this does:
+#   1. Repoints EVERY service's OTLP export to the Bindplane-managed gateway by overriding
+#      the single global `OTEL_COLLECTOR_NAME` (all services use http://$(OTEL_COLLECTOR_NAME):4317/4318).
+#   2. Disables the chart's bundled OTel collector (we use Bindplane instead).
+#   3. Disables the demo's local telemetry backends (Jaeger/Prometheus/Grafana/OpenSearch) —
+#      they only existed to receive from the bundled collector; dropping them frees ~2.4 GB.
+#   4. Leaves flagd + all app services + load-generator + kafka/postgres/valkey enabled.
+#
+# STILL TODO before first sync:
+#   - Points at the raw Dynatrace OTel Collector (Gateway) in the otel-collector namespace
+#     (collector-first path — see clusters/gke-playground/otel-collector/). When we adopt
+#     Bindplane later, this value only changes if the gateway Service DNS changes; the app
+#     wiring is otherwise identical. The collector must be running (sync-wave 15) before
+#     astroshop (wave 20) or services will fail to export until it exists (app still runs).
+
+default:
+  # envOverrides upserts into default.env by name — this replaces the collector host for ALL services.
+  # Services build http://$(OTEL_COLLECTOR_NAME):4317 (gRPC) / :4318 (HTTP) from this host.
+  envOverrides:
+    - name: OTEL_COLLECTOR_NAME
+      value: otel-collector.otel-collector.svc.cluster.local   # raw OTel Gateway Service DNS
+
+# --- Remove the bundled collector; Bindplane is the only egress to Dynatrace ---
+opentelemetry-collector:
+  enabled: false
+
+# --- Drop the demo's local backends (not needed; telemetry goes to Dynatrace via Bindplane) ---
+jaeger:
+  enabled: false
+prometheus:
+  enabled: false
+grafana:
+  enabled: false
+opensearch:
+  enabled: false
+
+# NOTE: frontend-proxy still exposes /jaeger /grafana /prometheus routes that will now 502 —
+# harmless for the shop itself. Browser (RUM) traces via PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+# also won't land until/if we route them through Bindplane; revisit if we want RUM in the demo.
+#
+# STEP 4 (DevCycle) — when ready, add per-service image + provider overrides here, e.g.:
+# components:
+#   product-catalog:
+#     imageOverride:
+#       repository: ghcr.io/bmg24/astroshop/product-catalog
+#       tag: devcycle
