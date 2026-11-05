@@ -15,7 +15,7 @@ Bindplane Cloud; the pipeline config gets rebuilt in Bindplane's UI, but the dat
 ## What it does / doesn't do
 
 - **Does:** OTLP receive (gRPC 4317 / HTTP 4318) → `k8sattributes` enrich → `batch` → `otlphttp`
-  export to `https://anr47691.sprint.dynatracelabs.com/api/v2/otlp`.
+  export to `https://lbn6737h.sprint.dynatracelabs.com/api/v2/otlp`.
 - **Doesn't:** collect node/cluster infra metrics or k8s events. The native **Kubernetes app**
   (namespace/workload/pod topology, node utilization) is already populated cluster-wide by the
   existing DynaKube `kubernetes-monitoring` ActiveGate — no OTel receivers needed for that.
@@ -38,7 +38,7 @@ Gateway Service DNS (what astroshop points at): `otel-collector.otel-collector.s
    ```bash
    kubectl create namespace otel-collector   # or let ArgoCD create it first
    kubectl -n otel-collector create secret generic dynatrace-otelcol-credentials \
-     --from-literal=DT_ENDPOINT='https://anr47691.sprint.dynatracelabs.com/api/v2/otlp' \
+     --from-literal=DT_ENDPOINT='https://lbn6737h.sprint.dynatracelabs.com/api/v2/otlp' \
      --from-literal=DT_API_TOKEN='dt0c01.<DATA_INGEST_TOKEN>'
    ```
 3. **Push** the gitops changes → ArgoCD syncs `apps/otel-collector.yaml` (sync-wave 15), which

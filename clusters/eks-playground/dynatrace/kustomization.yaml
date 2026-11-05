@@ -3,5 +3,5 @@ kind: Kustomization
 namespace: dynatrace
 resources:
   - dynakube.yaml
-# The token Secret is created out-of-band (see ../setup.md) and is NOT managed
+# The token Secret is created out-of-band (see ../bootstrap.md) and is NOT managed
 # here. If you later adopt Sealed Secrets / External Secrets, add it as a resource.

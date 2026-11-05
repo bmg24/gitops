@@ -8,7 +8,7 @@ description: >
 
 inputs:
   dt-url:
-    description: "Dynatrace env base URL, e.g. https://anr47691.sprint.dynatracelabs.com (no trailing slash, no /api)."
+    description: "Dynatrace env base URL, e.g. https://lbn6737h.sprint.dynatracelabs.com (no trailing slash, no /api)."
     required: true
   dt-token:
     description: "Access/platform token with scope openpipeline.events_sdlc."

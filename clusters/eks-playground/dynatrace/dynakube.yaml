@@ -1,8 +1,10 @@
-# DynaKube custom resource for the GKE playground cluster.
+# DynaKube custom resource for the EKS playground cluster
+# (AWS name brian-eks-playground; Dynatrace-facing name eks-playground).
 # Single full-stack DynaKube: cloudNativeFullStack OneAgent + one ActiveGate.
 #
-# IMAGE SOURCE (important): this sprint/internal tenant's built-in registry
-# (anr47691.sprint.dynatracelabs.com/linux/...) does NOT host the agent/AG/EEC
+# IMAGE SOURCE (important): the sprint/internal tenant's built-in registry
+# (<tenant>.sprint.dynatracelabs.com/linux/..., verified on the old anr47691 tenant)
+# does NOT host the agent/AG/EEC
 # container images — every manifest tag 404s. Dynatrace also recommends AGAINST
 # using the built-in registry for images. So we pull OneAgent / CodeModules /
 # ActiveGate from the public Amazon ECR registry instead (same source the OTel
@@ -25,7 +27,7 @@
 # for oneagent + codemodules; activegate has its own tag).
 #
 # NOTE: the token Secret ("brian-obs-playground") is created by hand (see
-# ../setup.md), gitignored, and ArgoCD applies only this CR.
+# ../bootstrap.md), gitignored, and ArgoCD applies only this CR.
 ---
 apiVersion: dynatrace.com/v1beta6
 kind: DynaKube
@@ -36,9 +38,9 @@ metadata:
     dynatrace.com/created-by: "dynatrace.kubernetes"
 # https://docs.dynatrace.com/docs/ingest-from/setup-on-k8s/reference/dynakube-parameters
 spec:
-  apiUrl: https://anr47691.sprint.dynatracelabs.com/api
+  apiUrl: https://lbn6737h.sprint.dynatracelabs.com/api
   tokens: brian-obs-playground
-  networkZone: gke
+  networkZone: eks-playground
   # Metadata-enrichment scope (added 2026-08-06). Keep enrichment on everywhere EXCEPT
   # namespaces labeled `dynatrace-injection: disabled`, so astroshop gets no Dynatrace
   # webhook mutation at all — it is observed purely via OpenTelemetry + Bindplane.
@@ -53,7 +55,7 @@ spec:
           values:
             - disabled
   oneAgent:
-    hostGroup: gke
+    hostGroup: eks-playground
     cloudNativeFullStack:
       # Injection scope (added 2026-08-06). In DynaKube v1beta6 the injection
       # namespaceSelector belongs to the AppInjectionSpec INSIDE cloudNativeFullStack

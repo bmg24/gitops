@@ -2,7 +2,7 @@
 #
 # WHY THIS EXISTS: the app-of-apps root (bootstrap/root-app.yaml) only syncs `path: apps`, so
 # `projects/` was never reconciled by ArgoCD — the live AppProject was whatever was last applied
-# by hand at bootstrap (setup.md §4). Result: adding a namespace to projects/playground.yaml and
+# by hand at bootstrap (clusters/eks-playground/bootstrap.md step 5). Result: adding a namespace to projects/playground.yaml and
 # pushing had NO effect until someone remembered `kubectl apply -f projects/playground.yaml`,
 # which is exactly what blocked the otel-collector app ("destination ... do not match any of the
 # allowed destinations in project 'playground'"). This Application closes that gap: edits to any
@@ -15,7 +15,7 @@
 #     that reference them.
 #   - prune: false (intentionally). AppProjects are high blast-radius — pruning a project would
 #     orphan every app in it. selfHeal still reverts manual drift on the live object.
-#   - Bootstrap still applies projects/playground.yaml once by hand (setup.md §4) so the `root`
+#   - Bootstrap still applies projects/playground.yaml once by hand (clusters/eks-playground/bootstrap.md step 5) so the `root`
 #     and `projects` apps have a project to belong to; after that this app owns ongoing changes.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

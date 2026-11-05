@@ -1,7 +1,7 @@
 # astroshop — pure-OTel via Bindplane (no OneAgent)
 
 Deploys [Astroshop](https://github.com/open-telemetry/opentelemetry-demo) (the OpenTelemetry
-Demo) to the GKE playground, observed **100% through OpenTelemetry + Bindplane** with **zero
+Demo) to the EKS playground, observed **100% through OpenTelemetry + Bindplane** with **zero
 OneAgent injection** — the vendor-neutral counterpart to easytrade's OneAgent full-stack story.
 
 ## How it's wired

@@ -1,6 +1,6 @@
 # Bindplane Gateway — the OTLP pipeline for astroshop
 
-A single **Bindplane-managed Gateway** collector in the GKE cluster routes **all astroshop
+A single **Bindplane-managed Gateway** collector in the EKS cluster routes **all astroshop
 telemetry (traces, metrics, logs) → Bindplane-managed collector → Dynatrace**, with **no
 OneAgent**. Control plane is **Bindplane Cloud** (`app.bindplane.com`); the collector dials out
 over OpAMP. This replaces the earlier raw `otel-collector` (dropped 2026-08-08).
@@ -32,7 +32,7 @@ astroshop points at the gateway Service DNS via `OTEL_COLLECTOR_NAME` in
 
 ### 1. Dynatrace destination (Bindplane Cloud → Destinations)
 - Type: **Dynatrace** (OTLP).
-- OTLP endpoint: `https://anr47691.sprint.dynatracelabs.com/api/v2/otlp`
+- OTLP endpoint: `https://lbn6737h.sprint.dynatracelabs.com/api/v2/otlp`
 - API token: **reuse the data-ingest token already created** for the raw collector
   (`dt0c01`, scopes `openTelemetryTrace.ingest`, `metrics.ingest`, `logs.ingest`). Bindplane
   applies the `Authorization: Api-Token <token>` header for you.
