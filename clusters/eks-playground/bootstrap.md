@@ -1,91 +1,77 @@
-# GKE playground — one-time bootstrap
+# EKS playground: one-time bootstrap
 
-Manual provisioning (no Terraform). Run top to bottom. Keep this file updated if
-you change flags — it's your rebuild recipe.
+Run top to bottom on a cluster that already meets [`cluster-contract.md`](cluster-contract.md).
+How the current cluster was actually built (and how to tear it down) is in
+[`BUILD_LOG.md`](BUILD_LOG.md). Keep this file updated if you change a step: it's the
+rebuild recipe.
 
-Project: `sales-engineering-noram` · Account: `brian.goins@dynatrace.com`
+Cluster: `brian-eks-playground` · Region: `us-east-1` · Dynatrace tenant: `lbn6737h` (sprint)
 
-## 0. Prereqs (local / Cloud Shell)
+## 1. Connect
+
+Requires the AWS CLI signed in to the account that owns the cluster.
 
 ```bash
-gcloud components install gke-gcloud-auth-plugin   # needed for kubectl auth
-gcloud config set project sales-engineering-noram
+aws eks update-kubeconfig --name brian-eks-playground --region us-east-1
+kubectl config current-context        # must end in cluster/brian-eks-playground
+kubectl get nodes                     # expect 2 Ready nodes (scales 0 to 3)
 ```
 
-## 1. Create the GKE cluster
+## 2. Default StorageClass (gp3)
 
-Sized for the DynaKube in this repo: the `kubernetes-monitoring` ActiveGate
-requests **10Gi** memory and there are **3× routing** ActiveGates at 4Gi each,
-plus the OneAgent DaemonSet, CSI driver, and easytrade. A 3–4 node
-`e2-standard-4` pool (16Gi/node) handles it; autoscaling gives headroom.
+The AWS org policy denies creating **gp2** volumes, and EKS marks no StorageClass as
+default on this cluster. Without this step every PVC stays `Pending`.
 
 ```bash
-gcloud container clusters create easytrade-playground \
-  --zone=us-central1-a \
-  --release-channel=regular \
-  --num-nodes=4 \
-  --machine-type=e2-standard-4 \
-  --enable-autoscaling --min-nodes=3 --max-nodes=7 \
-  --workload-pool=sales-engineering-noram.svc.id.goog
+kubectl apply -f clusters/eks-playground/storageclass-gp3.yaml
+kubectl get storageclass              # expect: gp3 (default)
 ```
 
-Notes:
-- Zonal (single `--zone`) keeps cost down; `--region` would triple node count.
-- `--workload-pool` enables Workload Identity now so it's ready later (it does
-  NOT require `setIamPolicy` — that's only needed when you *bind* a GCP SA).
-- Today's images all come from **public** registries, so no Artifact Registry
-  IAM is needed. Your `roles/editor` + `container.admin` are sufficient.
+## 3. Dynatrace token Secret (NOT in Git)
 
-Get credentials:
+Classic **`dt0c01`** tokens from tenant `lbn6737h`: an operator token (template
+"Kubernetes: Dynatrace Operator") and a data-ingest token (`metrics.ingest`,
+`logs.ingest`, `openTelemetryTrace.ingest`). Run this in your own terminal, not in a
+chat or anything that records output:
 
 ```bash
-gcloud container clusters get-credentials easytrade-playground --zone=us-central1-a
-kubectl get nodes
+kubectl create namespace dynatrace --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n dynatrace create secret generic brian-obs-playground \
+  --from-literal=apiToken='<CLASSIC_OPERATOR_TOKEN>' \
+  --from-literal=dataIngestToken='<DATA_INGEST_TOKEN>'
 ```
 
-## 2. Create the Dynatrace token Secret (NOT in Git)
+The DynaKube (`spec.tokens: brian-obs-playground`) reads this Secret by name; it never
+lives in the repo.
 
-⚠️ Rotate both tokens in the tenant first — the originals were shared in
-plaintext. Then create the Secret directly in the cluster:
-
-```bash
-kubectl create namespace dynatrace
-kubectl -n dynatrace create secret generic brian-goins-playground \
-  --from-literal=apiToken='dt0s16.<ROTATED_API_TOKEN>' \
-  --from-literal=dataIngestToken='dt0s16.<ROTATED_DATA_INGEST_TOKEN>'
-```
-
-The operator (DynaKube `spec.tokens: brian-goins-playground`) reads this Secret.
-It is referenced by name only and never lives in the repo.
-
-## 3. Install ArgoCD
+## 4. Install ArgoCD (pinned)
 
 ```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.3/manifests/install.yaml
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n argocd --server-side --force-conflicts \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.6.1/manifests/install.yaml
 kubectl -n argocd rollout status deploy/argocd-server
-```
-
-Use a **pinned** ArgoCD version (not `stable`) to avoid component/CRD drift across
-rebuilds. Quick post-install check:
-
-```bash
 kubectl get crd applicationsets.argoproj.io
 ```
 
-Get the initial admin password and open the UI:
+- `--server-side` is required: the ApplicationSet CRD exceeds the client-side apply
+  annotation limit.
+- v3.6.x is the only ArgoCD line tested on Kubernetes 1.37. Avoid 3.4.x below 3.4.10
+  (October 2026 critical advisories). ArgoCD 3.5+ bundles Helm 4.
+
+UI access (run in your own terminal so the password stays private):
 
 ```bash
-kubectl -n argocd get secret argocd-initial-admin-secret \
-  -o jsonpath="{.data.password}" | base64 -d; echo
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
 kubectl -n argocd port-forward svc/argocd-server 8080:443
-# browse https://localhost:8080  (user: admin)
+# browse https://localhost:8080 (user: admin), change the password, then:
+kubectl -n argocd delete secret argocd-initial-admin-secret
 ```
 
-## 4. Bootstrap the app-of-apps
+## 5. Bootstrap the app-of-apps
 
-Make sure you've pushed this repo to GitHub and replaced `bmg24`
-everywhere (see repo README). Then:
+ArgoCD reads `main` of `https://github.com/bmg24/gitops.git`, so push your changes
+first. Then, from the repo root:
 
 ```bash
 kubectl apply -f projects/playground.yaml    # one-time seed; thereafter managed by apps/projects.yaml
@@ -94,43 +80,47 @@ kubectl apply -f bootstrap/root-app.yaml
 
 The first `projects/playground.yaml` apply is a one-time seed so the `root` and `projects` apps
 have a project to belong to. **After bootstrap, the AppProject is GitOps-managed** by
-`apps/projects.yaml` (sync-wave -5) — edit `projects/playground.yaml`, commit, push, and ArgoCD
-reconciles it. Do **not** hand-apply it again (if the live object ever drifts, `selfHeal` restores
-it, or force it with `argocd app sync projects`).
+`apps/projects.yaml` (sync-wave -5): edit `projects/playground.yaml`, commit, push, and ArgoCD
+reconciles it. Do **not** hand-apply it again.
 
-ArgoCD now syncs in waves: projects (-5) → operator (0) → DynaKube (5) → easytrade (10) →
-astroshop (20). The astroshop OTLP gateway is a Bindplane-managed collector installed by hand
-(not ArgoCD) — see `bindplane/README.md`.
+Sync waves: projects (-5) → operator (0) → DynaKube (5) → easytrade (10).
 
-## 5. Verify
+Astroshop, Bindplane and the retired raw OTel collector are parked in `apps-disabled/`
+(not synced). To enable one, `git mv apps-disabled/<app>.yaml apps/`, commit and push.
+Astroshop needs the Bindplane gateway first; it's installed by hand from Bindplane Cloud
+(see `bindplane/README.md`).
+
+## 6. Verify
 
 ```bash
-kubectl -n dynatrace get pods                 # operator, CSI, ActiveGates, OneAgent
+kubectl -n argocd get applications            # all Synced / Healthy
+kubectl -n dynatrace get pods                 # operator, webhook, CSI driver, ActiveGate, OneAgent
 kubectl -n dynatrace get dynakube
 kubectl -n easytrade get pods
-kubectl -n easytrade get svc frontendreverseproxy   # EXTERNAL-IP = the app URL
+kubectl -n easytrade get svc frontendreverseproxy   # EXTERNAL-IP = the app URL (creates a billable AWS load balancer)
 ```
 
-In the tenant (`anr47691.sprint.dynatracelabs.com`):
-- Kubernetes app → cluster `easytrade-playground` reporting
-- Hosts/Services → easytrade services with OneAgent traces + business events
+In the tenant (`lbn6737h.sprint.apps.dynatracelabs.com`):
+- Kubernetes app → the cluster is reporting
+- Hosts → host group `eks-playground`; network zone `eks-playground`
+- Services → easytrade services with OneAgent traces and business events
 
-## 6. SDLC / pipeline observability (GitHub Actions)
+## 7. SDLC / pipeline observability (GitHub Actions)
 
 This sends **normalized `SDLC_EVENT`s** (pipeline run, build, deployment, change)
-to Dynatrace every time `easytrade-config` changes — independent of the cluster,
+to Dynatrace every time `easytrade-config` changes. It's independent of the cluster,
 so you can wire it up before or after the cluster is live.
 
 1. **Create the SDLC ingest token** in the tenant
    (Access Tokens → Generate). Scope: **`openpipeline.events_sdlc`**.
-   This is a *different* token from the OneAgent api/dataIngest Secret above.
+   This is a *different* token from the operator/data-ingest Secret above.
 
 2. **Add repo (or org) secrets** on the `easytrade-config` repo
    (Settings → Secrets and variables → Actions):
 
    | Secret | Value |
    |---|---|
-   | `DT_URL` | `https://anr47691.sprint.dynatracelabs.com`  (no `/api`, no trailing slash) |
+   | `DT_URL` | `https://lbn6737h.sprint.dynatracelabs.com`  (no `/api`, no trailing slash) |
    | `DT_SDLC_TOKEN` | the `openpipeline.events_sdlc` token from step 1 |
 
 3. The reusable sender action lives in **this** (`gitops`) repo at
@@ -155,20 +145,21 @@ so you can wire it up before or after the cluster is live.
    ```
 
 See [`../../docs/sdlc-events.md`](../../docs/sdlc-events.md) for the full design,
-field mapping, and how to extend it to new repos (e.g. the future `ai-app`).
+field mapping, and how to extend it to new repos.
 
 ## Troubleshooting
 
 - **dynakube app fails on first sync** ("no matches for kind DynaKube" / webhook
   not ready): the CRD/webhook needed a moment. Re-sync the `dynatrace-dynakube`
   app (retry is configured, so it usually self-heals).
-- **ActiveGate pod Pending**: not enough memory on any node for the 10Gi request.
-  Bump `--machine-type` (e.g. `e2-standard-8`) or lower the AG memory in dynakube.yaml.
-- **easytrade pods CrashLoop on first boot**: DB init ordering — give it a minute
+- **ActiveGate pod Pending**: no node has room for its memory request (10Gi in
+  `dynatrace/dynakube.yaml`; nodes have ~14.4 GiB allocatable). Lower the AG memory
+  or scale the node group up.
+- **PVC stuck Pending**: check `kubectl get storageclass` shows `gp3 (default)` and that
+  the chart doesn't name `gp2` (blocked by org policy). After scaling nodes to 0 and
+  back, a pod whose volume is in the other AZ waits for a node in that AZ
+  ("volume node affinity conflict"): scale back to 2 nodes.
+- **easytrade pods CrashLoop on first boot**: DB init ordering. Give it a minute
   or restart the failing deployment.
 
-## Teardown
-
-```bash
-gcloud container clusters delete easytrade-playground --zone=us-central1-a
-```
+Teardown steps are in [`BUILD_LOG.md`](BUILD_LOG.md#teardown-when-done).
