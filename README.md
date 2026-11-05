@@ -23,7 +23,7 @@ gitops/
 ├── .github/actions/
 │   └── dt-sdlc-event/         # reusable composite action: POST SDLC_EVENT to Dynatrace
 └── clusters/
-    └── gke-playground/
+    └── eks-playground/
         ├── setup.md           # one-time manual cluster + ArgoCD bootstrap + SDLC setup
         └── dynatrace/
             ├── kustomization.yaml
@@ -41,13 +41,13 @@ gitops/
    chart (**1.8.1**); bump deliberately from
    https://github.com/Dynatrace/dynatrace-operator/releases
 3. **Never commit the Dynatrace token Secret.** It is created manually in
-   `clusters/gke-playground/setup.md`. The `.gitignore` blocks `secret.yaml`.
+   `clusters/eks-playground/setup.md`. The `.gitignore` blocks `secret.yaml`.
 4. **SDLC events:** add `DT_URL` + `DT_SDLC_TOKEN` secrets to the `easytrade-config`
    repo. See [`docs/sdlc-events.md`](docs/sdlc-events.md).
 
 ## Bootstrap
 
-See [`clusters/gke-playground/setup.md`](clusters/gke-playground/setup.md).
+See [`clusters/eks-playground/setup.md`](clusters/eks-playground/setup.md).
 
 ## Sync ordering
 

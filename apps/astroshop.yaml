@@ -1,6 +1,6 @@
 # Astroshop (OpenTelemetry Demo) — deployed pure-OTel via Bindplane, NO OneAgent.
 #
-# Design (see clusters/gke-playground/astroshop/README.md):
+# Design (see clusters/eks-playground/astroshop/README.md):
 #   - Community Helm chart `opentelemetry-demo` (chart source) + our values overrides
 #     (values file lives in THIS gitops repo, pulled via the multi-source $values ref).
 #   - Bundled OTel collector + demo backends (Jaeger/Prometheus/Grafana/OpenSearch) are
@@ -32,7 +32,7 @@ spec:
       targetRevision: 0.41.0
       helm:
         valueFiles:
-          - $values/clusters/gke-playground/astroshop/values.yaml
+          - $values/clusters/eks-playground/astroshop/values.yaml
     # 2) This gitops repo, only to supply the values file above (ref: values).
     - repoURL: https://github.com/bmg24/gitops.git
       targetRevision: main

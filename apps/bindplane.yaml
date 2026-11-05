@@ -1,7 +1,7 @@
 # Bindplane collectors (Node + Gateway) — OPTIONAL GitOps wrapper.
 #
 # Bindplane's supported install is `kubectl apply` of the UI-generated manifest (see
-# clusters/gke-playground/bindplane/README.md). This Application simply syncs any collector
+# clusters/eks-playground/bindplane/README.md). This Application simply syncs any collector
 # manifests you commit into that folder, so the pipeline is reproducible from git. It is
 # sync-wave 15 — BEFORE astroshop (wave 20) — so the gateway exists before astroshop exports.
 #
@@ -19,7 +19,7 @@ spec:
   source:
     repoURL: https://github.com/bmg24/gitops.git
     targetRevision: main
-    path: clusters/gke-playground/bindplane
+    path: clusters/eks-playground/bindplane
     directory:
       recurse: true
       # Only render committed collector manifests; ignore docs.

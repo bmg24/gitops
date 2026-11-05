@@ -254,7 +254,7 @@ skopeo list-tags docker://public.ecr.aws/dynatrace/dynatrace-oneagent   # or bro
 ## File layout (gitops repo)
 
 ```
-clusters/gke-playground/
+clusters/eks-playground/
 ├── setup.md                     # cluster + ArgoCD bootstrap recipe (+ SDLC section)
 ├── TROUBLESHOOTING.md           # this file
 └── dynatrace/

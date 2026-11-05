@@ -12,7 +12,7 @@
 # Collector target:
 #   - Points at the Bindplane-managed Gateway collector in the `bindplane-agent` namespace.
 #     The gateway is installed OUT OF BAND from Bindplane Cloud (UI → Install Collectors →
-#     kubectl apply), NOT via ArgoCD — see clusters/gke-playground/bindplane/README.md.
+#     kubectl apply), NOT via ArgoCD — see clusters/eks-playground/bindplane/README.md.
 #     Have the gateway Service up before/around the astroshop deploy; until it exists the
 #     services just retry their OTLP export (the shop still runs).
 #   - VERIFY the Service DNS after install: `kubectl get svc -n bindplane-agent` (ports 4317/4318).
