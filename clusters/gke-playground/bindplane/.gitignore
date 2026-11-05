@@ -1,0 +1,5 @@
+# Never commit the Bindplane OpAMP registration secret (API key). Apply it by hand via kubectl,
+# same pattern as the DynaKube token. Commit only the collector Deployment/DaemonSet/Service.
+secret.yaml
+*-secret.yaml
+bindplane-*-key*.yaml

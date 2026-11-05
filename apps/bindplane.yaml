@@ -1,0 +1,43 @@
+# Bindplane collectors (Node + Gateway) — OPTIONAL GitOps wrapper.
+#
+# Bindplane's supported install is `kubectl apply` of the UI-generated manifest (see
+# clusters/gke-playground/bindplane/README.md). This Application simply syncs any collector
+# manifests you commit into that folder, so the pipeline is reproducible from git. It is
+# sync-wave 15 — BEFORE astroshop (wave 20) — so the gateway exists before astroshop exports.
+#
+# The OpAMP registration Secret is gitignored and applied by hand (like the DynaKube token),
+# so ArgoCD manages only the Deployment/DaemonSet/Service, not the credential.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bindplane
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  project: playground
+  source:
+    repoURL: https://github.com/bmg24/gitops.git
+    targetRevision: main
+    path: clusters/gke-playground/bindplane
+    directory:
+      recurse: true
+      # Only render committed collector manifests; ignore docs.
+      include: '*.yaml'
+      exclude: '{README.md}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bindplane-agent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

@@ -62,8 +62,15 @@ It is referenced by name only and never lives in the repo.
 
 ```bash
 kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.3/manifests/install.yaml
 kubectl -n argocd rollout status deploy/argocd-server
+```
+
+Use a **pinned** ArgoCD version (not `stable`) to avoid component/CRD drift across
+rebuilds. Quick post-install check:
+
+```bash
+kubectl get crd applicationsets.argoproj.io
 ```
 
 Get the initial admin password and open the UI:
@@ -81,11 +88,19 @@ Make sure you've pushed this repo to GitHub and replaced `bmg24`
 everywhere (see repo README). Then:
 
 ```bash
-kubectl apply -f projects/playground.yaml
+kubectl apply -f projects/playground.yaml    # one-time seed; thereafter managed by apps/projects.yaml
 kubectl apply -f bootstrap/root-app.yaml
 ```
 
-ArgoCD now syncs in waves: operator (0) → DynaKube (5) → easytrade (10).
+The first `projects/playground.yaml` apply is a one-time seed so the `root` and `projects` apps
+have a project to belong to. **After bootstrap, the AppProject is GitOps-managed** by
+`apps/projects.yaml` (sync-wave -5) — edit `projects/playground.yaml`, commit, push, and ArgoCD
+reconciles it. Do **not** hand-apply it again (if the live object ever drifts, `selfHeal` restores
+it, or force it with `argocd app sync projects`).
+
+ArgoCD now syncs in waves: projects (-5) → operator (0) → DynaKube (5) → easytrade (10) →
+astroshop (20). The astroshop OTLP gateway is a Bindplane-managed collector installed by hand
+(not ArgoCD) — see `bindplane/README.md`.
 
 ## 5. Verify
 

@@ -2,7 +2,7 @@
 
 > **Purpose:** Self-contained context for the Dynatrace deployment on the GKE
 > playground. Read this to understand the current state and the issues that were
-> resolved getting there. **Last updated:** 2026-06-16.
+> resolved getting there. **Last updated:** 2026-08-08.
 
 ---
 
@@ -161,6 +161,50 @@ URL is a git repository': evalsymlink failure on
   If the path is plain YAML, ArgoCD deploys it as a directory; if it has a local `kustomization.yaml`, ArgoCD builds it locally (no remote base).
 - **To keep patches:** instead vendor the upstream manifests into `easytrade-config/` (copy the YAML in) and kustomize over local files, or use an ArgoCD **multi-source** app (upstream repo as a `ref`, overlay as the build source). Remote git bases inside kustomize-under-ArgoCD should be avoided.
 - Until fixed, easytrade won't deploy — but it does **not** block the Dynatrace stack, which is healthy and reporting.
+
+### Problem 5 — ArgoCD `applicationset-controller` restart loop (`BackOff`) ✅ fixed
+
+Dynatrace problems **P-26080324** and **P-26080850** flagged the ArgoCD
+`argocd-applicationset-controller` deployment as unhealthy with repeated `BackOff`
+events.
+
+- **Symptom:** pod showed very high historical restart count and repeated backoff.
+- **Root cause:** the `ApplicationSet` CRD was missing:
+  `applicationsets.argoproj.io` did not exist, and controller logs showed:
+  `failed to get restmapping: no matches for kind "ApplicationSet" in version "argoproj.io/v1alpha1"`.
+- **Fix applied (2026-08-08):** restored only the missing CRD at the currently-running
+  ArgoCD version:
+  ```bash
+  kubectl apply --server-side -f \
+    https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.3/manifests/crds/applicationset-crd.yaml
+  ```
+  (`--server-side` avoids the CRD annotation size limit from client-side apply.)
+- **Validation:** `argocd-applicationset-controller` reached `1/1 Running`; restart
+  count stayed unchanged over 5+ minutes; logs progressed from restmapping errors to
+  `Starting Controller` / `Starting workers`.
+- **Classification:** config/drift issue (missing CRD), **not** node capacity pressure.
+
+### Problem 6 — AppProject not GitOps-managed → new namespaces rejected ✅ fixed (2026-08-08)
+
+Deploying the astroshop OTel path, the `otel-collector` ArgoCD app was rejected with:
+```
+application destination server 'https://kubernetes.default.svc' and namespace 'otel-collector'
+do not match any of the allowed destinations in project 'playground'
+```
+- **Root cause:** the app-of-apps root (`bootstrap/root-app.yaml`) syncs **only** `path: apps`, so
+  `projects/` was never reconciled by ArgoCD. The live `playground` AppProject was frozen at
+  whatever was hand-applied at bootstrap; adding `otel-collector` (and `astroshop`) to
+  `projects/playground.yaml` in git had no effect on the cluster. The error surfaces as an
+  Application **condition** (`InvalidSpecError`), not a stdout log — see it via
+  `kubectl -n argocd get app otel-collector -o jsonpath='{.status.conditions}'` or the UI tile.
+  The controller's reconciliation trail *is* in Dynatrace logs: `fetch logs | filter
+  k8s.namespace.name == "argocd" | filter contains(content, "otel-collector")`.
+- **Immediate unblock:** `kubectl apply -f projects/playground.yaml` (idempotent).
+- **Durable fix (2026-08-08):** `apps/projects.yaml` (new) — an Application under the built-in
+  `default` project, sync-wave **-5**, that GitOps-manages `projects/`. AppProject edits now
+  auto-sync. `prune: false` on it intentionally (pruning a project would orphan all its apps).
+  Bootstrap still seeds `projects/playground.yaml` once by hand; see `setup.md` §4.
+- **Classification:** GitOps coverage gap (project outside the managed path), not a runtime fault.
 
 ---
 

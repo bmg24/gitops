@@ -12,9 +12,12 @@ gitops/
 ├── projects/
 │   └── playground.yaml        # ArgoCD AppProject (scopes repos + destinations)
 ├── apps/                      # one ArgoCD Application per workload
+│   ├── projects.yaml            # sync-wave -5 — GitOps-manages projects/ (project: default)
 │   ├── dynatrace-operator.yaml  # sync-wave 0  — Helm chart from public.ecr.aws (v1.8.1)
 │   ├── dynatrace-dynakube.yaml  # sync-wave 5  — DynaKube CRs (this repo)
-│   └── easytrade.yaml           # sync-wave 10 — points at easytrade-config repo
+│   ├── easytrade.yaml           # sync-wave 10 — points at easytrade-config repo
+│   └── astroshop.yaml           # sync-wave 20 — OpenTelemetry demo (pure OTel via Bindplane gateway)
+│                                #   NB: the Bindplane gateway itself is hand-applied, not in ArgoCD
 ├── docs/
 │   └── sdlc-events.md         # SDLC / pipeline-observability design + DQL
 ├── .github/actions/
