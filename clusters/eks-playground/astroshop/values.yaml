@@ -44,8 +44,23 @@ opensearch:
 # harmless for the shop itself. Browser (RUM) traces via PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 # also won't land until/if we route them through Bindplane; revisit if we want RUM in the demo.
 #
-# STEP 4 (DevCycle) — when ready, add per-service image + provider overrides here, e.g.:
-# components:
+# --- Node2Shell (CVE-2026-111497) 2026-11-06 ---
+# Released astroshop images (3.0.0 / 3.1.0) were built before the October 2026 Node.js security
+# releases. Upstream merged the fix on 2026-10-27 but has not tagged a release since, so frontend
+# and payment use the main-branch builds of 2026-11-03, pinned by digest (multi-arch index).
+# Revert to the chart defaults once a release newer than 3.1.0 ships.
+# Verify the runtime version in Dynatrace (Node2Shell dashboard) after rollout.
+components:
+  frontend:
+    imageOverride:
+      repository: ghcr.io/open-telemetry/demo
+      tag: latest-frontend@sha256:588c8b5d2150c42e7e8c343ebc1ae0592e95c399651e142e0123e53cdaf942dc
+  payment:
+    imageOverride:
+      repository: ghcr.io/open-telemetry/demo
+      tag: latest-payment@sha256:d906e496164994318c911e8ee6cc138a8b26053a2ae5645b3d76008e26ed78ed
+
+# STEP 4 (DevCycle) — when ready, merge per-service overrides into `components` above, e.g.:
 #   product-catalog:
 #     imageOverride:
 #       repository: ghcr.io/bmg24/astroshop/product-catalog
