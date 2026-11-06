@@ -56,6 +56,12 @@ components:
       repository: ghcr.io/open-telemetry/demo
       tag: latest-frontend@sha256:588c8b5d2150c42e7e8c343ebc1ae0592e95c399651e142e0123e53cdaf942dc
   payment:
+    # Main-branch image bakes the OTel Node agent at /otel-auto-instrumentation-nodejs and sets its
+    # own NODE_OPTIONS. Chart 0.41.0 overrides it with the old npm-module path, which no longer
+    # exists in the image (MODULE_NOT_FOUND crash loop), so set the new path explicitly.
+    envOverrides:
+      - name: NODE_OPTIONS
+        value: --require /otel-auto-instrumentation-nodejs/autoinstrumentation.js
     imageOverride:
       repository: ghcr.io/open-telemetry/demo
       tag: latest-payment@sha256:d906e496164994318c911e8ee6cc138a8b26053a2ae5645b3d76008e26ed78ed
