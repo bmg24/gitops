@@ -16,6 +16,9 @@ spec:
   oneAgent:
     hostGroup: eks-playground
     cloudNativeFullStack:
+      # Public ECR: the default registry (478983378254.dkr.ecr...) returns 403 to our nodes.
+      image: public.ecr.aws/dynatrace/dynatrace-oneagent:1.349.106.20261029-103936
+      codeModulesImage: public.ecr.aws/dynatrace/dynatrace-codemodules:1.347.62.20261019-084101
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
@@ -24,6 +27,7 @@ spec:
           key: node-role.kubernetes.io/control-plane
           operator: Exists
   activeGate:
+    image: public.ecr.aws/dynatrace/dynatrace-activegate:1.349.67.20261029-110441
     capabilities:
       - routing
       - debugging
@@ -36,6 +40,7 @@ spec:
         memory: 4Gi
     replicas: 1
   kubernetesMonitoring:
+    image: public.ecr.aws/dynatrace/dynatrace-activegate:1.349.67.20261029-110441
     replicas: 1
     registration:
       clusterName: eks-playground
