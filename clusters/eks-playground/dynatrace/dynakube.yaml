@@ -16,6 +16,16 @@ spec:
   oneAgent:
     hostGroup: eks-playground
     cloudNativeFullStack:
+      # Inject only app namespaces. Excludes platform namespaces (argocd, external-dns, default)
+      # and anything labeled dynatrace-injection=disabled (astroshop, pure OTel).
+      namespaceSelector:
+        matchExpressions:
+          - key: dynatrace-injection
+            operator: NotIn
+            values: ["disabled"]
+          - key: kubernetes.io/metadata.name
+            operator: NotIn
+            values: ["argocd", "default", "external-dns"]
       # Public ECR: the default registry (478983378254.dkr.ecr...) returns 403 to our nodes.
       image: public.ecr.aws/dynatrace/dynatrace-oneagent:1.349.106.20261029-103936
       codeModulesImage: public.ecr.aws/dynatrace/dynatrace-codemodules:1.347.62.20261019-084101
@@ -60,6 +70,17 @@ spec:
       imageRef:
         repository: public.ecr.aws/dynatrace/dynatrace-k8s-node-config-collector
         tag: 1.6.3
+  # Same scope for metadata enrichment as for injection.
+  metadataEnrichment:
+    enabled: true
+    namespaceSelector:
+      matchExpressions:
+        - key: dynatrace-injection
+          operator: NotIn
+          values: ["disabled"]
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: ["argocd", "default", "external-dns"]
   logMonitoring: {}
   telemetryIngest:
     protocols:
@@ -69,11 +90,12 @@ spec:
       - zipkin
     serviceName: telemetry-ingest
   kspm:
+    # /sys/kernel/security/apparmor removed 2026-11-06: EKS AL2023 nodes have no AppArmor, so the
+    # hostPath mount fails and node-config-collector pods sit in ContainerCreating.
     mappedHostPaths:
       - /boot
       - /etc
       - /proc/sys/kernel
       - /sys/fs
-      - /sys/kernel/security/apparmor
       - /usr/lib/systemd/system
       - /var/lib
