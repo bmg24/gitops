@@ -1,7 +1,7 @@
 # gitops
 
 ArgoCD control repo (app-of-apps) for the observability playground.
-This repo is the **source of truth** for what runs on the GKE cluster.
+This repo is the **source of truth** for what runs on the EKS cluster (`brian-eks-playground`).
 
 ## Layout
 
@@ -11,17 +11,25 @@ gitops/
 │   └── root-app.yaml          # app-of-apps: syncs everything in apps/
 ├── projects/
 │   └── playground.yaml        # ArgoCD AppProject (scopes repos + destinations)
-├── apps/                      # one ArgoCD Application per workload
-│   ├── dynatrace-operator.yaml  # sync-wave 0  — Helm chart from public.ecr.aws (v1.8.1)
+├── apps/                      # one ArgoCD Application per workload (synced by the root app)
+│   ├── projects.yaml            # sync-wave -5 — GitOps-manages projects/ (project: default)
+│   ├── dynatrace-operator.yaml  # sync-wave 0  — Helm chart from public.ecr.aws (v1.11.1)
 │   ├── dynatrace-dynakube.yaml  # sync-wave 5  — DynaKube CRs (this repo)
-│   └── easytrade.yaml           # sync-wave 10 — points at easytrade-config repo
+│   └── easytrade.yaml           # sync-wave 10 — easytrade Helm chart (bmg24/easytrade-1)
+├── apps-disabled/             # parked Applications, NOT synced; git mv one into apps/ to enable
+│   ├── bindplane.yaml           # sync-wave 15 — Bindplane collectors (gateway is hand-installed)
+│   ├── otel-collector.yaml      # sync-wave 15 — retired raw OTel gateway (namespace removed from project)
+│   └── astroshop.yaml           # sync-wave 20 — OpenTelemetry demo (pure OTel via Bindplane gateway)
 ├── docs/
 │   └── sdlc-events.md         # SDLC / pipeline-observability design + DQL
 ├── .github/actions/
 │   └── dt-sdlc-event/         # reusable composite action: POST SDLC_EVENT to Dynatrace
 └── clusters/
-    └── gke-playground/
-        ├── setup.md           # one-time manual cluster + ArgoCD bootstrap + SDLC setup
+    └── eks-playground/
+        ├── cluster-contract.md   # what the EKS cluster must provide (size, add-ons, storage)
+        ├── bootstrap.md          # connect, token Secret, ArgoCD install, root app, SDLC setup
+        ├── BUILD_LOG.md          # how brian-eks-playground was actually built + teardown
+        ├── storageclass-gp3.yaml # default StorageClass (org policy blocks gp2)
         └── dynatrace/
             ├── kustomization.yaml
             ├── dynakube.yaml         # DynaKube CRs (NO secret)
@@ -35,16 +43,16 @@ gitops/
    from the `repos/` folder: `./set-github-org.sh <your-github-username>`
    (covers `bootstrap/`, `projects/`, `apps/`, and the `easytrade-config` workflow).
 2. `apps/dynatrace-operator.yaml` `targetRevision` is pinned to the latest GA
-   chart (**1.8.1**); bump deliberately from
+   chart (**1.11.1**); bump deliberately from
    https://github.com/Dynatrace/dynatrace-operator/releases
-3. **Never commit the Dynatrace token Secret.** It is created manually in
-   `clusters/gke-playground/setup.md`. The `.gitignore` blocks `secret.yaml`.
+3. **Never commit the Dynatrace token Secret.** It is created manually
+   (see `clusters/eks-playground/bootstrap.md`). The `.gitignore` blocks `secret.yaml`.
 4. **SDLC events:** add `DT_URL` + `DT_SDLC_TOKEN` secrets to the `easytrade-config`
    repo. See [`docs/sdlc-events.md`](docs/sdlc-events.md).
 
 ## Bootstrap
 
-See [`clusters/gke-playground/setup.md`](clusters/gke-playground/setup.md).
+See [`clusters/eks-playground/bootstrap.md`](clusters/eks-playground/bootstrap.md) (cluster requirements: [`cluster-contract.md`](clusters/eks-playground/cluster-contract.md)).
 
 ## Sync ordering
 
@@ -52,6 +60,7 @@ ArgoCD sync-waves guarantee order on first apply:
 
 | Wave | App | Why |
 |---|---|---|
+| -5 | projects | Owns the `playground` AppProject before workload apps reference it |
 | 0 | dynatrace-operator | Installs CRDs (incl. DynaKube) + admission webhook |
 | 5 | dynatrace-dynakube | Needs the DynaKube CRD + webhook to exist first |
 | 10 | easytrade | App workload; OneAgent injects once DynaKube is ready |

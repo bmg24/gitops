@@ -10,10 +10,11 @@ spec:
   source:
     repoURL: public.ecr.aws/dynatrace
     chart: dynatrace-operator
-    # Pinned to the latest GA release. The 1.9.0 line is still RC/pre-release
-    # (unsupported) as of 2026-06-16 — do not use it on the playground.
+    # Pinned to the latest GA release as of 2026-11-05. Dynatrace's support table lists
+    # Kubernetes 1.37 (the EKS cluster's version) with recommended Operator 1.9.0+.
+    # Chart kubeVersion: >=1.25. Fresh install, so no step-by-step upgrade was needed.
     # https://github.com/Dynatrace/dynatrace-operator/releases
-    targetRevision: 1.8.1
+    targetRevision: 1.11.1
     helm:
       values: |
         # CSI driver is required for cloudNativeFullStack (local OneAgent cache)

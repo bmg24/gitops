@@ -1,0 +1,50 @@
+# Self-manage the ArgoCD AppProject(s) via GitOps.
+#
+# WHY THIS EXISTS: the app-of-apps root (bootstrap/root-app.yaml) only syncs `path: apps`, so
+# `projects/` was never reconciled by ArgoCD — the live AppProject was whatever was last applied
+# by hand at bootstrap (clusters/eks-playground/bootstrap.md step 5). Result: adding a namespace to projects/playground.yaml and
+# pushing had NO effect until someone remembered `kubectl apply -f projects/playground.yaml`,
+# which is exactly what blocked the otel-collector app ("destination ... do not match any of the
+# allowed destinations in project 'playground'"). This Application closes that gap: edits to any
+# AppProject now sync automatically.
+#
+# DESIGN NOTES:
+#   - project: default (the built-in, allow-all project) — NOT `playground`. Using `playground`
+#     here would be self-referential (this app would manage the very project it belongs to).
+#   - sync-wave "-5": AppProjects should exist before the workload apps (operator=0 … astroshop=20)
+#     that reference them.
+#   - prune: false (intentionally). AppProjects are high blast-radius — pruning a project would
+#     orphan every app in it. selfHeal still reverts manual drift on the live object.
+#   - Bootstrap still applies projects/playground.yaml once by hand (clusters/eks-playground/bootstrap.md step 5) so the `root`
+#     and `projects` apps have a project to belong to; after that this app owns ongoing changes.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: projects
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/bmg24/gitops.git
+    targetRevision: main
+    path: projects
+    directory:
+      recurse: true
+      include: '*.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false      # never auto-delete an AppProject
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 3m

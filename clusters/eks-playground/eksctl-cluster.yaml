@@ -1,0 +1,50 @@
+# NOT USED: eksctl create was blocked by an AWS org SCP; the cluster was created in the console
+# (see BUILD_LOG.md). Kept as a reference for the intended shape.
+# eksctl ClusterConfig for brian-eks-playground (see PROJECT_CLEANUP.md "Cluster contract")
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: brian-eks-playground
+  region: us-east-1
+  version: "1.35"
+  tags:
+    owner: brian.goins
+    purpose: observability-playground
+    ttl: review-monthly
+
+# Reuse the existing public subnets in brian-test-vpc (shared VPC: do not modify it).
+# AWS account is at its 30-VPC limit, so eksctl cannot create a new VPC.
+vpc:
+  id: vpc-056c104d40850a84b
+  subnets:
+    public:
+      us-east-1a:
+        id: subnet-04a6e5a3a182ecd83
+      us-east-1b:
+        id: subnet-089e674d4e07c9bde
+
+iam:
+  withOIDC: true
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: aws-ebs-csi-driver
+    wellKnownPolicies:
+      ebsCSIController: true
+
+managedNodeGroups:
+  - name: ng-main
+    instanceType: m6i.xlarge
+    desiredCapacity: 2
+    minSize: 0        # scale to 0 when idle (eksctl scale nodegroup)
+    maxSize: 3
+    volumeSize: 50
+    volumeType: gp3
+    privateNetworking: false
+    tags:
+      owner: brian.goins
+      purpose: observability-playground
+      ttl: review-monthly

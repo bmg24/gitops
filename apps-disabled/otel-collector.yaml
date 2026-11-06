@@ -2,7 +2,7 @@
 #
 # Bindplane-UNMANAGED to start: a plain Gateway collector that receives astroshop OTLP and
 # exports to the Dynatrace tenant. This replaces the Bindplane collectors as the initial egress
-# (see clusters/gke-playground/otel-collector/README.md). Promote to Bindplane management later
+# (see clusters/eks-playground/otel-collector/README.md). Promote to Bindplane management later
 # by repointing the collector's OpAMP endpoint — no change to astroshop wiring required.
 #
 # Sync-wave 15: BEFORE astroshop (wave 20), so the gateway Service exists before astroshop
@@ -22,7 +22,7 @@ spec:
   source:
     repoURL: https://github.com/bmg24/gitops.git
     targetRevision: main
-    path: clusters/gke-playground/otel-collector
+    path: clusters/eks-playground/otel-collector
     directory:
       recurse: true
       include: '*.yaml'

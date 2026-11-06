@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/bmg24/gitops.git
     targetRevision: main
-    path: clusters/gke-playground/dynatrace
+    path: clusters/eks-playground/dynatrace
   destination:
     server: https://kubernetes.default.svc
     namespace: dynatrace

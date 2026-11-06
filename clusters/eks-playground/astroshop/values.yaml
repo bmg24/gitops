@@ -9,19 +9,22 @@
 #      they only existed to receive from the bundled collector; dropping them frees ~2.4 GB.
 #   4. Leaves flagd + all app services + load-generator + kafka/postgres/valkey enabled.
 #
-# STILL TODO before first sync:
-#   - Points at the raw Dynatrace OTel Collector (Gateway) in the otel-collector namespace
-#     (collector-first path — see clusters/gke-playground/otel-collector/). When we adopt
-#     Bindplane later, this value only changes if the gateway Service DNS changes; the app
-#     wiring is otherwise identical. The collector must be running (sync-wave 15) before
-#     astroshop (wave 20) or services will fail to export until it exists (app still runs).
+# Collector target:
+#   - Points at the Bindplane-managed Gateway collector in the `bindplane-agent` namespace.
+#     The gateway is installed OUT OF BAND from Bindplane Cloud (UI → Install Collectors →
+#     kubectl apply), NOT via ArgoCD — see clusters/eks-playground/bindplane/README.md.
+#     Have the gateway Service up before/around the astroshop deploy; until it exists the
+#     services just retry their OTLP export (the shop still runs).
+#   - VERIFY the Service DNS after install: `kubectl get svc -n bindplane-agent` (ports 4317/4318).
+#     The value below assumes a gateway collector named `bindplane-gateway-agent`; change it if
+#     you named the collector/config differently in Bindplane.
 
 default:
   # envOverrides upserts into default.env by name — this replaces the collector host for ALL services.
   # Services build http://$(OTEL_COLLECTOR_NAME):4317 (gRPC) / :4318 (HTTP) from this host.
   envOverrides:
     - name: OTEL_COLLECTOR_NAME
-      value: otel-collector.otel-collector.svc.cluster.local   # raw OTel Gateway Service DNS
+      value: bindplane-gateway-agent.bindplane-agent.svc.cluster.local   # Bindplane Gateway Service DNS (verify after install)
 
 # --- Remove the bundled collector; Bindplane is the only egress to Dynatrace ---
 opentelemetry-collector:

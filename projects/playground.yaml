@@ -26,8 +26,6 @@ spec:
       namespace: astroshop
     - server: https://kubernetes.default.svc
       namespace: bindplane-agent
-    - server: https://kubernetes.default.svc
-      namespace: otel-collector
   # Operator installs cluster-scoped resources (CRDs, webhooks, RBAC)
   clusterResourceWhitelist:
     - group: "*"

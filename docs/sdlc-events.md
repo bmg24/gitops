@@ -58,7 +58,7 @@ On **merge to `main`** (or manual run):
 On **pull requests**: `change` / `started` (opened/reopened) and
 `change` / `finished` (closed → `vcs.change.state` = merged or closed).
 
-> The actual rollout to GKE is done by **ArgoCD** watching this repo (GitOps).
+> The actual rollout to EKS is done by **ArgoCD** watching this repo (GitOps).
 > The `deployment` events above represent that rollout keyed to the merged
 > commit. For an event emitted by the deployer itself, add **ArgoCD
 > notifications** posting to the same endpoint — a good Phase-2 enhancement.
