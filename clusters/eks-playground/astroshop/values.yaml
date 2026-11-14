@@ -25,6 +25,22 @@ default:
   envOverrides:
     - name: OTEL_COLLECTOR_NAME
       value: bindplane-gateway-agent.bindplane-agent.svc.cluster.local   # Bindplane Gateway Service DNS (verify after install)
+    # Chart default is `cumulative`; Bindplane's Dynatrace destination does not support monotonic
+    # cumulative sums, so export delta (design doc §3 item 2, §5.5).
+    - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+      value: delta
+
+  # Dedicated OTel-lane node (EKS node group ng-astroshop): label lane=otel, taint lane=otel:NoSchedule,
+  # no OneAgent. The chart reads default.schedulingRules for every workload (verified on chart 0.41.0:
+  # all 25 rendered workloads, incl. kafka, astronomy-db, valkey-cart, flagd, load-generator, get it).
+  schedulingRules:
+    nodeSelector:
+      lane: otel
+    tolerations:
+      - key: lane
+        operator: Equal
+        value: otel
+        effect: NoSchedule
 
 # --- Remove the bundled collector; Bindplane is the only egress to Dynatrace ---
 opentelemetry-collector:
